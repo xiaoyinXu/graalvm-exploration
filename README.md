@@ -1,7 +1,6 @@
-# GraalVM Exploration
+# GraalVM探索
 
-## 介绍
-
+## GraalVM介绍
 11月初的时候Spring Boot 3.0发布，其中有一个很吸引人的特性：aot（ahead ho time compilation），用户可以直接将Spring
 Boot应用提前编译成当前操作系统、CPU架构相关的能直接运行的机器代码。区别于传统Java应用jit(Just-In-Time compilation)的运行模式，aot使Java程序不再需要预热，大大提升了应用的启动速度，而Spring
 Boot 3.0 aot依赖的组件就是GraalVM里的native-image。
@@ -26,10 +25,8 @@ GraalVM底层聚焦于编译技术(Graal Compiler), 在应用层面提供三个�
 2. 支持AOT。提供native-image工具，
 3. 支持Polyglot Programming。 本文主要对这三个特性进行简单的介绍和做一些DEMO演示。
 
-## JIT优化
-
+## JIT和Graal JIT Compiler
 #### 什么是jit和warm up?
-
 jit即just-in-time(即时编译), java源码首先被javac编译成字节码.class文件，当字节码被类加载器加载到hotspot里后，java方法首先会被解释器执行，当方法被执行到一定次数会被识别成热点方法，并由jit
 compiler直接编译成本地机器能够执行的native代码，从而加速方法的执行效率。
 
@@ -101,8 +98,7 @@ compiler在编译方面优化较少但编译耗时短，c2 compiler在编译方�
 
 然而c2 compiler主要由C++编写，维护起来比较困难，最近几年jdk已经很少对其进行优化.
 
-#### Graal Compiler
-
+#### Graal Jit Compiler有什么优势？
 Graal Compiler完全由Java进行编写，没有历史包袱，根据Open JDK9提出的JVMCI规范(允许用java开发jit编译器)，Graal
 Compiler可以作为c2的替代品，在一些场景提供更多的优化。这里需要指出jit在将字节码翻译成机器代码前会做很多优化，例如函数内联(Inline)、逃逸分析(Escape Analysis)等，而这些优化在Graal
 Compiler里被抽象成Phase，目前Graal Compiler内置了大概62个Phase，其中27个授予专利。我们可以通过Idea查看：
@@ -114,10 +110,8 @@ Compiler在一些经常用到Java高级特性（比如Stream、Lambdas）的应�
 Compiler的优势在于它是Java编写的，维护和拓展起来更加方便，还可以让用户很方便的进行调试(需要加上`-XX:-UseJVMCINativeLibrary`参数)。当使用Graal VM
 JDK时，通过`-XX:-UseJVMCICompiler`就可以使用原本的c2 compiler了。
 
-## AOT-native image
-
-#### 简单介绍
-
+## AOT和native-image
+#### 什么是native-image
 native-image是GraalVM非常亮眼且GraalVM团队宣传最多的cli工具，用于实现AOT。
 
 据GraalVM项目发起人说明，AOT和JIT在底层代码上有80%-90%是重叠的(主要是Graal Compiler)
@@ -197,13 +191,13 @@ jar包里又嵌套jar包，native-image对这种情况可能暂不支持）。�
 
 为了使native-image更加工程化，GraalVM提供了相应的maven、gradle插件，用户可以将native-image用到的各种命令行参数维护在pom.xml配置文件，并通过mvn生命周期或者执行goal的方式一键构建。
 
-## Polyglot Programming
-#### Truffle简单介绍
+## Truffle和多语言编程
+#### 什么是Truffle?
 [Truffle](https://www.graalvm.org/latest/graalvm-as-a-platform/language-implementation-framework/)是一个开源的实现动态编程语言的框架，它可以使用户实现的编程语言高效的运行在GraalVM上。
 使用Truffle，用户只需关注构建抽象语法树（AST）和具体树节点的定义和执行逻辑，而Truffle专注于提升编程语言性能(借助Graal Compiler)和提供与其它基于Truffle实现语言的交互能力。目前GraalVM基于Truffle实现了[Python](https://github.com/oracle/graalpython), 
 [JavaScript](https://github.com/oracle/graaljs), [Ruby](https://github.com/oracle/truffleruby/), [R](https://github.com/oracle/fastr), 和支持运行能够被编译成LLVM bitcode的语言,如C/C++。
 
-#### GraalPy Performance
+#### GraalPy性能表现
 GraalPy目前实现Python 3.8, 还处于试验阶段，支持的第三方库比较少。对于纯Python编写的程序（不依赖C/C++函数库）时，其速度远快于CPython, 例如以下代码：
 ```python
 import time
@@ -222,10 +216,10 @@ print("it costs {} s".format(end_ts - start_ts))
 ![](image/performance-python.png)
 由上图可以看出，graalpy比cpython的执行速度大概快了10倍。
 
-#### GraalPy Access jar
+#### GraalPy访问jar包
 由Truffle实现的编程语言可以很容易与Java生态打通，例如GraalPy可以借助Polyglot API调用第三方jar包，需指定classpath：
 
-#### Polyglot Programming in one java application
+#### 跨语言调用
 比较常见的应用场景是Java作为Host Language, 其它语言作为Guest Language, 实现多语言编程（运行在同一个进程里）：
 ![](image/polyglot-java-example.png)
 上述代码由Java编写，主要用到了Polyglot API。首先在"python"里创建了一个数组"[1, 2, 3]", 再将这个数组绑定到了"javascript"的上下文里，再由javascript去访问这个数组进行一个求和。从这个例子我们可以感受到GraalVM可以很方便地完成多语言的数据共享，并基于[Truffle Polyglot Interop Protocol](https://www.graalvm.org/22.2/reference-manual/java-on-truffle/interoperability/)保证了对象操作的安全性：上面由Python创建的数组，在js通过调用"pythonArr.length"时，实际会委托给对象的创建语言去执行，也就是调用python方法len。
@@ -233,7 +227,6 @@ print("it costs {} s".format(end_ts - start_ts))
 #### Java On Truffle
 GraalVM用Truffle实现了Java本身，即Java On Truffle，目前也处于试验阶段，不建议生产使用。
 
-## Summary
-
+## 总结
 期待GraalVM和OpenJDK一起发展
 
