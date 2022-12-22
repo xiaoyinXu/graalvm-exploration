@@ -4,16 +4,18 @@
 11月初的时候Spring Boot发布3.0版本，其中有一个很亮眼的特性：aot（ahead ho time compilation），用户可以直接将Spring Boot应用提前编译成能直接运行的机器代码。区别于传统Java应用jit(Just-In-Time compilation)的运行模式，aot使Java程序不再需要预热，大大提升了应用的启动速度，而Spring Boot 3.0 aot依赖的组件就是GraalVM里的native-image。
 
 其实早在JDK9，OpenJDK就提供了jaotc命令，即对AOT提供了有限支持。java的AOT在2016年由[JEP 295: Ahead-of-Time Compilation](https://openjdk.org/jeps/295)提出，而jaotc底层依赖的就是Graal Compiler(也就是GraalVM的核心部分)，但是由于其使用场景较少且维护成本大，2021年OpenJDK[JEP 410: Remove the Experimental AOT and JIT Compiler](https://openjdk.org/jeps/410)提出移除对Graal
-Compiler的支持，并指出开发者可以转向GraalVM。
+Compiler的支持，并指出对AOT感兴趣的开发者可以转向GraalVM。
 
 然而2022 10月25日 Oracle又宣布将GraalVM贡献给Open JDK，这意味着GraalVM会跟随OpenJDK的节奏一起发展（每6月一个发行版本）。
 
 那GraalVM是什么呢？GraalVM是一个完全由Java开发的[开源项目](https://github.com/oracle/graal)，同时也是JDK的一种发行版本。根据官网的[介绍](https://www.graalvm.org/latest/docs/introduction/):
 > GraalVM是一个高性能的JDK发型版本，它致力于加速JVM平台语言应用的执行，同时提供JavaScript, Python, Ruby, R, C/C++(需先转换成bitcode)的运行环境；GraalVM提供两种方式运行Java应用，JIT和AOT。GraalVM的使用户可以在一个应用里进行多语言编程（省去传统跨语言调用的开销）。
 
-GraalVM架构图：TODO
+GraalVM架构图：
+![](https://bj.bcebos.com/cookie/graalvm_architecture_community.png)
 
-GraalVM开源项目：TODO
+[GraalVM开源项目](https://www.graalvm.org/community/opensource/)：
+![](https://bj.bcebos.com/cookie/graalvm-open-source.png)
 
 GraalVM在应用层面提供三个关键的特性/能力：
 
@@ -31,7 +33,7 @@ GraalVM底层聚焦的主要是编译技术，本文首先会谈一谈"编译"�
 
 "原始码"并不一定是编程语言源代码，而"目标码"也并不一定是可以直接执行的机器码，编译和解释的区别主要在`整体`和`逐条`上。
 
-常见的编译型语言有C、C++、Golang、Rust等,它们的源代码在编译期间被`整体`转换成可以直接执行的机器码；常见的解释型语言有Python、Javascript，它们的源代码在运行期间被逐条解释执行。而Java严格意义上属于半编译半解释型语言，且它有多个编译阶段。首先Java源码通过javac被`整体`转换成字节码，这是第一阶段的编译。而在运行期间，当字节码被类加载器加载到虚拟机时,非热点方法的方法体的所有字节码指令(操作码 + 数据)会被`逐条`解释执行，而热点方法的整个方法体会被"整体"编译成机器码，这是第二阶段的编译。
+常见的编译型语言有C、C++、Golang、Rust等,它们的源代码在编译期间被`整体`转换成可以直接执行的机器码；常见的解释型语言有Python、Javascript，它们的源代码在运行期间被逐条解释执行。而Java严格意义上属于半编译半解释型语言，且它有多个编译阶段。首先Java源码通过javac被`整体`转换成字节码，这是第一阶段的编译。而在运行期间，当字节码被类加载器加载到虚拟机时,非热点方法的方法体的所有字节码指令(操作码 + 数据)会被`逐条`解释执行，而热点方法的整个方法体会被`整体`编译成机器码，这是第二阶段的编译。
 
 编译型语言特点：
 
@@ -66,13 +68,11 @@ jit和aot本质上并没有什么不同，都是编译，都是将"原始码"整
 
 ## HotSpot JIT Compiler和Graal JIT Compiler
 #### 什么是jit和warm up?
-jit即just-in-time(即时编译), java源码首先被javac编译成字节码.class文件，当字节码被类加载器加载到hotspot里后，java方法首先会被解释器执行，当方法被执行到一定次数会被识别成热点方法，并由jit
-compiler直接编译成本地机器能够执行的native代码，从而加速方法的执行效率。
+jit即just-in-time(即时编译), java源码首先被javac编译成字节码.class文件，当字节码被类加载器加载到hotspot里后，java方法首先会被解释器执行，当方法被执行到一定次数会被识别成热点方法，并由jit compiler直接编译成本地机器能够执行的native代码，从而加速方法的执行效率。
 
 而 `类加载 -> 方法解释执行 -> 执行编译后的代码`这个过程可以认为是java程序的warm up时间，经过这个阶段后，java程序的性能才会达到峰值。
 
-例如以下例子
-
+例如以下例子：
 ```java
 public class WarmUpTest {
     public static void main(String[] args) {
@@ -124,37 +124,30 @@ public class WarmUpTest {
 ```
 
 运行结果打印如下：
-![](image/warm-up-1.png)
+![](https://bj.bcebos.com/cookie/warm-up-1.png)
 
 而当我们加上jvm参数:`-Xint`, 该程序将不考虑jit,完全被解释执行：
-![](image/warm-up-2.png)
+![](https://bj.bcebos.com/cookie/warm-up-2.png)
 可以看出，有jit的情况下，程序持续执行的速度更快，并且执行效率呈现从慢到快并趋于平稳的趋势。
 
-hotspot里有两类jit compiler, 一个是client compiler(也被称作c1 compiler), 一个是server compiler(也被称作c2 compiler)。c1
-compiler在编译方面优化较少但编译耗时短，c2 compiler在编译方面优化较多但耗时长，为了权衡两者，hotspot里默认是分层编译(tiered-compilation)，我们可以打印jvm默认参数进行验证。
-![](image/tiered-compilation.png)
+hotspot里有两类jit compiler, 一个是client compiler(也被称作c1 compiler), 一个是server compiler(也被称作c2 compiler)。c1 compiler在编译方面优化较少但编译耗时短，c2 compiler在编译方面优化较多但耗时长，为了权衡两者，hotspot里默认是分层编译(tiered-compilation)，我们可以打印jvm默认参数进行验证。
+![](https://bj.bcebos.com/cookie/tiered-compilation.png)
 默认情况下，我们可以粗略的认为，当一个方法被执行到2000次时会被c1 compiler进行编译，被执行到15000次会被c2 compiler进行编译。
 
 然而c2 compiler主要由C++编写，维护起来比较困难，最近几年jdk已经很少对其进行优化。
 
 #### Graal Jit Compiler有什么优势？
-Graal Compiler完全由Java进行编写，没有历史包袱，根据Open JDK9提出的[JVMCI](https://openjdk.org/jeps/243)规范(允许用java开发jit编译器)，Graal
-Compiler可以作为c2的替代品，在一些场景提供更多的优化。这里需要指出jit在将字节码翻译成机器代码前会做很多优化，例如函数内联(Inline)、逃逸分析(Escape Analysis)等，而这些优化在Graal
-Compiler里被抽象成Phase，目前Graal Compiler内置了大概62个Phase，其中27个授予专利。我们可以通过Idea查看：
-![](image/phase.png)
-据[GraalVM](https://www.graalvm.org/latest/reference-manual/java/compiler/)说明，Graal
-Compiler在一些经常用到Java高级特性（比如Stream、Lambdas）的应用表现得更好，而对IO密集型程序提升很小。
+Graal Compiler完全由Java进行编写，没有历史包袱，根据Open JDK9提出的[JVMCI](https://openjdk.org/jeps/243)规范(允许用java开发jit编译器)，Graal Compiler可以作为c2的替代品，在一些场景提供更多的优化。这里需要指出jit在将字节码翻译成机器代码前会做很多优化，例如函数内联(Inline)、逃逸分析(Escape Analysis)等，而这些优化在Graal Compiler里被抽象成Phase，目前Graal Compiler内置了大概62个Phase，其中27个授予专利。我们可以通过Idea查看：
+![](https://bj.bcebos.com/cookie/phase.png)
+根据[GraalVM](https://www.graalvm.org/latest/reference-manual/java/compiler/)说明，Graal Compiler在一些经常用到Java高级特性（比如Stream、Lambdas）的应用表现得更好，而对IO密集型程序提升很小。
 
-经过自己简单的测验，Graal Compiler相较于c2 compiler提升不是特别明显，甚至有些场景表现得还不如c2 compiler。但Graal
-Compiler的优势在于它是Java编写的，维护和拓展起来更加方便，还可以让用户很方便的进行调试(需要加上`-XX:-UseJVMCINativeLibrary`参数)。当使用Graal VM
-JDK时，通过`-XX:-UseJVMCICompiler`就可以使用原本的c2 compiler了。
+经过自己简单的测验，Graal Compiler相较于c2 compiler提升不是特别明显，甚至有些场景表现得还不如c2 compiler。但Graal Compiler的优势在于它是Java编写的，维护和拓展起来更加方便，还可以让用户很方便的进行调试(需要加上`-XX:-UseJVMCINativeLibrary`参数)。当使用Graal VM JDK时，通过`-XX:-UseJVMCICompiler`就可以使用原本的c2 compiler了。
 
 ## AOT和native-image
 #### 什么是native-image
 native-image是GraalVM非常亮眼且GraalVM团队宣传最多的cli工具，用于实现AOT。
 
-据GraalVM项目发起人说明，AOT和JIT在底层代码上有80%-90%是重叠的(主要是Graal Compiler)
-。事实上，无论是JIT还是AOT，它们都是将字节码编译成机器代码，只不过JIT是在运行时监测热点方法并编译，而AOT是构建时将所有触达的方法都编译。从结果表现上来说，AOT方式运行的Java程序在启动时就达到性能峰值，而JIT方式运行的Java程序启动性能较差（需要经过warm
+据GraalVM项目发起人说明，AOT和JIT在底层代码上有80%-90%是重叠的(主要是Graal Compiler)。事实上，无论是JIT还是AOT，它们都是将字节码编译成机器代码，只不过JIT是在运行时监测热点方法并编译，而AOT是构建时将所有触达的方法都编译。从结果表现上来说，AOT方式运行的Java程序在启动时就达到性能峰值，而JIT方式运行的Java程序启动性能较差（需要经过warm
 up）,但随着时间不断的优化，最终性能会稍好于AOT运行方式。
 
 native-image有以下优势：
@@ -165,9 +158,9 @@ native-image有以下优势：
 
 #### native-image demo
 
-![](image/hello-world.png)
+![](https://bj.bcebos.com/cookie/hello-world.png)
 
-![](image/spring-boot-3-demo.png)
+![](https://bj.bcebos.com/cookie/spring-boot-3-demo.png)
 
 #### 一些关键命令行参数
 
@@ -182,7 +175,7 @@ linux下.so文件，大部分都是动态链接库文件。而目前应用容器
 
 `--initialize-at-build-time`
 这个命令用于指定哪些类在构建时就进行类初始化。类初始化时会执行static代码块和一些static变量的直接初始化（实际也会被放进static代码快）。传统Java应用static代码块会在运行时才执行（类被加载并访问静态变量、静态方法等场景时执行），而native-image允许在构建的时候就执行static代码块，例如：
-![](image/hello-world-initialization.png)
+![](https://bj.bcebos.com/cookie/hello-world-initialization.png)
 从上图可以看出，static代码块在构建时就被执行了，因而在运行时便不再执行。
 
 在构建时初始化有好处也有坏处，具体可以查看这篇[文章](https://medium.com/graalvm/updates-on-class-initialization-in-graalvm-native-image-generation-c61faca461f7)：
@@ -197,14 +190,13 @@ linux下.so文件，大部分都是动态链接库文件。而目前应用容器
 1. 会破坏用户期望的行为。例如获取CPU核数、获取当前系统时间等逻辑被放在了static代码块里, 那构建时初始化会使得程序在每次运行时都输出构建时的相应状态。
 
 由于坏处较明显，GraalVM默认构建时不初始化任何类，由用户通过--initialize-at-build-time指定，但JDK内置类强制构建时初始化（例如创建枚举类实例），而用户代码或者框架代码也可以在META-INF/native-image下创建native-image.properties显式指定哪些类在构建时初始化:
-![](image/netty-native-image-properties.png)
+![](https://bj.bcebos.com/cookie/netty-native-image-properties.png)
 
 具体命令行参数可以通过 `native-image --help`, `native-image --expert-options`, `native-image --expert-options-all`查看。
 
 #### limitations
 
-native-image提前编译Java程序后，可以使Java程序启动快、内存占用小，那当然也得有一定的牺牲。native-image基于"closed-world-assumption"
-理念，它假定所有的代码在运行时是可知的，也就是说运行时不会加载新的代码，这也就意味着java的一些动态特性会被阉割：
+native-image提前编译Java程序后，可以使Java程序启动快、内存占用小，那当然也得有一定的牺牲。native-image基于"closed-world-assumption"理念，它假定所有的代码在运行时是可知的，也就是说运行时不会加载新的代码，这也就意味着java的一些动态特性会被阉割：
 
 例如javaagent, bytecode manipulation(动态字节码技术，如javassist，asm, cglib, byte-buddy)等是被指出不允许使用的。---所以可以曲线救国，比如在构建时生成动态代理类。
 
@@ -212,19 +204,15 @@ native-image提前编译Java程序后，可以使Java程序启动快、内存占
 
 1. 构建时会根据代码自动分析哪些地方用到了这些动态特性。
 2. 用户可以通过`元数据配置文件`显式指定哪些地方用到了这些动态特性（太麻烦，不建议）。
-3.
-提供[graalvm-reachability-metadata github仓库](https://github.com/oracle/graalvm-reachability-metadata)，让社区一同维护常用框架的`元数据配置文件`。
-4. GraalVM内置tracing-agent代理工具,
-   执行命令（例如`java -agentlib:native-image-agent=config-merge-dir=src/main/resources/META-INF/native-image -jar target/XXX.jar`)
-   后，会在运行时自动生成相应的`元数据配置文件`。
+3. 提供[graalvm-reachability-metadata github仓库](https://github.com/oracle/graalvm-reachability-metadata)，让社区一同维护常用框架的`元数据配置文件`。
+4. GraalVM内置tracing-agent代理工具, 执行命令（例如`java -agentlib:native-image-agent=config-merge-dir=src/main/resources/META-INF/native-image -jar target/XXX.jar`)后，会在运行时自动生成相应的`元数据配置文件`。
 5. GraalVM通过社区合作，使一些微服务框架（例如Quarkus, Micronaut, Helidon, Spring Boot）内部支持native-image。
 
-经过上面几个步骤，很多大型的Java程序也可以勉强跑起来了, 例如社区里有人用native-image将我的世界(minecraft)跑起来了,
-具体参考[文章](https://medium.com/graalvm/native-minecraft-servers-with-graalvm-native-image-1a3f6a92eb48):
-而minecraft用到的"元数据配置文件"也维护在[github仓库](https://github.com/hpi-swa/native-minecraft-server)上。
+经过上面几个步骤，很多大型的Java程序也可以勉强跑起来了, 例如社区里有人用native-image将我的世界(minecraft)跑起来了, 具体参考[文章](https://medium.com/graalvm/native-minecraft-servers-with-graalvm-native-image-1a3f6a92eb48)，而minecraft用到的"元数据配置文件"也维护在[github仓库](https://github.com/hpi-swa/native-minecraft-server)上。
 
-但我在尝试用native-image编译Flink应用程序时，卡在了Akka SPI的加载上（失败原因应该是flink-akka
-jar包里又嵌套jar包，native-image对这种情况可能暂不支持）。不过考虑到稳定性和峰值性能，对于Flink这种持续运行在后台且追求高吞吐的场景，建议还是以jit的方式运行。
+但我在尝试用native-image编译Flink应用程序时，卡在了Akka SPI的加载上（失败原因应该是flink-akka jar包里又嵌套jar包，native-image对这种情况可能暂不支持）。
+
+不过考虑到稳定性和峰值性能，对于Flink这种持续运行在后台且追求高吞吐的场景，建议还是以jit的方式运行。
 
 #### native-maven-plugin
 为了使native-image更加工程化，GraalVM提供了相应的maven、gradle插件，用户可以将native-image用到的各种命令行参数维护在pom.xml配置文件，并通过mvn生命周期或者执行goal的方式一键构建。
@@ -237,8 +225,8 @@ TODO
 ## Truffle和多语言编程
 #### 什么是Truffle?
 [Truffle](https://www.graalvm.org/latest/graalvm-as-a-platform/language-implementation-framework/)是一个开源的实现动态编程语言的框架，它可以使用户实现的编程语言高效的运行在GraalVM上。
-使用Truffle，用户只需关注构建抽象语法树（AST）和具体树节点的定义和执行逻辑，而Truffle专注于提升编程语言性能(借助Graal Compiler)和提供与其它基于Truffle实现语言的交互能力。目前GraalVM基于Truffle实现了[Python](https://github.com/oracle/graalpython), 
-[JavaScript](https://github.com/oracle/graaljs), [Ruby](https://github.com/oracle/truffleruby/), [R](https://github.com/oracle/fastr), 和支持运行能够被编译成LLVM bitcode的语言,如C/C++。
+使用Truffle，用户只需关注构建抽象语法树（AST）和具体树节点的定义和执行逻辑，而Truffle专注于提升编程语言性能(借助Graal Compiler)和提供与其它基于Truffle实现语言的交互能力。
+目前GraalVM基于Truffle实现了[Python](https://github.com/oracle/graalpython),[JavaScript](https://github.com/oracle/graaljs), [Ruby](https://github.com/oracle/truffleruby/), [R](https://github.com/oracle/fastr), 和支持运行能够被编译成LLVM bitcode的语言,如C/C++。
 
 #### GraalPy性能表现
 GraalPy目前实现Python 3.8, 还处于试验阶段，支持的第三方库比较少。对于纯Python编写的程序（不依赖C/C++函数库）时，其速度远快于CPython, 例如以下代码：
@@ -256,7 +244,7 @@ end_ts = time.time()
 print("it costs {} s".format(end_ts - start_ts))
 ```
 
-![](image/performance-python.png)
+![](https://bj.bcebos.com/cookie/performance-python.png)
 由上图可以看出，graalpy比cpython的执行速度大概快了10倍。
 
 #### GraalPy访问jar包
@@ -264,12 +252,12 @@ print("it costs {} s".format(end_ts - start_ts))
 
 #### 跨语言调用
 比较常见的应用场景是Java作为Host Language, 其它语言作为Guest Language, 实现多语言编程（运行在同一个进程里）：
-![](image/polyglot-java-example.png)
+![](https://bj.bcebos.com/cookie/polyglot-java-example.png)
 上述代码由Java编写，主要用到了Polyglot API。首先在"python"里创建了一个数组"[1, 2, 3]", 再将这个数组绑定到了"javascript"的上下文里，再由javascript去访问这个数组进行一个求和。从这个例子我们可以感受到GraalVM可以很方便地完成多语言的数据共享，并基于[Truffle Polyglot Interop Protocol](https://www.graalvm.org/22.2/reference-manual/java-on-truffle/interoperability/)保证了对象操作的安全性：上面由Python创建的数组，在js通过调用"pythonArr.length"时，实际会委托给对象的创建语言去执行，也就是调用python方法len。
 
 #### Java On Truffle
 GraalVM用Truffle实现了Java本身，即Java On Truffle，目前也处于试验阶段，不建议生产使用。
 
 ## 总结
-期待GraalVM和OpenJDK一起发展
+期待GraalVM和OpenJDK一起发展。
 
