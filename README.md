@@ -34,14 +34,14 @@ GraalVM底层聚焦的主要是编译技术，本文首先会谈一谈"编译"�
 
 常见的编译型语言有C、C++、Golang、Rust等，它们的源代码在编译期间被`整体`转换成可以直接执行的机器码；常见的解释型语言有Python、Javascript，它们的源代码在运行期间被逐条解释执行。而Java严格意义上属于半编译半解释型语言，且它有多个编译阶段。首先Java源码通过javac被`整体`转换成字节码，这是第一阶段的编译。而在运行期间，当字节码被类加载器加载到虚拟机时，非热点方法的方法体的所有字节码指令(操作码 + 数据)会被`逐条`解释执行，而热点方法的整个方法体会被`整体`编译成机器码，这是第二阶段的编译。
 
-编译型语言特点：
-
+(纯)编译型语言特点：
 `优点`：
 1. 执行速度快。例如C/C++等编程语言，在运行时源码已经完全转换成可以直接执行的机器码了。
 
 `缺点`：
 1. 灵活性差。一旦涉及到源码的改动，需要重新编译，而编译时间（尤其是大型项目）一般都是很漫长的。
 2. 可移植性/跨平台性差。例如C/C++等编程语言，源码编译后会被完全转换成和当前操作系统、CPU架构相关的机器码，而这个机器码一般不能移植到不同架构的平台的。所以一般对此的解决方案是cross-compilation(交叉编译)，即在一个平台上就能编译生成多个平台版本的机器码。
+3. 三方库使用起来比较麻烦。(编译结果和CPU系统、CPU架构耦合，且需要考虑动态链接/静态链接等)。
 
 解释型语言特点：
 
@@ -174,6 +174,8 @@ native-image里有一些常用到的命令行参数，例如:
 
 `-Ob`加速构建过程（但编译优化较少，建议仅用在开发环境）。
 
+`--gc=`选择垃圾回收器，目前仅支持epsilon(不回收)、serial、G1。
+
 `--static`、` -H:+StaticExecutableWithDynamicLibC`用于静态链接(默认动态链接)。
 
 静态链接即将依赖的一些机器代码（如c函数库libc）直接打包进应用程序里，这种方式将所有依赖都打包，移植性较好，但最总可执行文件磁盘占用大。而动态链接编译方式并不会直接将libc等库直接打包进应用程序里，而是留下类似指针的描述符，运行时按需加载，这使得最终可执行文件磁盘磁盘占用较小，且动态链接被加载到内存后可以由多个进程共享。
@@ -239,7 +241,7 @@ native-image生成的可执行程序可以借助jvisualvm工具进行监控，�
 #### 什么是Truffle?
 [Truffle](https://www.graalvm.org/latest/graalvm-as-a-platform/language-implementation-framework/)是一个开源的实现动态编程语言的框架，它可以使用户实现的编程语言高效的运行在GraalVM上。
 
-使用Truffle，用户只需关注构建抽象语法树（AST）和具体树节点的定义和执行逻辑，而Truffle专注于提升编程语言性能(借助Graal Compiler)和提供与其它基于Truffle实现语言的交互能力。
+使用Truffle，用户只需关注构建抽象语法树（AST）和具体树节点的定义和执行逻辑，而Truffle专注于提升编程语言性能(借助Truffle Compile和Graal Compiler)和提供与其它编程语言的交互能力。
 
 目前GraalVM基于Truffle实现了[Python](https://github.com/oracle/graalpython)，[JavaScript](https://github.com/oracle/graaljs)，[Ruby](https://github.com/oracle/truffleruby/)，[R](https://github.com/oracle/fastr)，和支持运行能够被编译成LLVM bitcode的语言，如C/C++。
 
@@ -309,4 +311,4 @@ GraalVM在应用层面存在三个关键能力：
 1. GraalPy还在起步阶段，在三方库（尤其是依赖C/C++）上支持的不是很好。
 2. Polyglot API能满足简单的跨语言调用，但对于复杂场景和模块化的支持不是很足。
 
-GraalVM出现在大众视野中还没有多久，很多地方还在不断优化，期待GraalVM和OpenJDK的一起发展～
+GraalVM出现在大众视野中还没有多久，很多地方还在不断优化，目前Oracle已计划将GraalVM社区版本代码贡献给OpenJDK，期待GraalVM和Java的发展～
