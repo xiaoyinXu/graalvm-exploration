@@ -220,7 +220,6 @@ native-image提前编译Java程序后，可以使Java程序启动快、内存占
 #### PGO
 native-image可以借助PGO(Profile-Guided Optimizations)进一步优化性能。具体可以参考[文章](https://www.graalvm.org/latest/reference-manual/native-image/guides/optimize-native-executable-with-pgo/)。
 大致步骤就是先通过native-image生成初版的可执行文件，运行该可执行文件生成profiling文件，并基于该profiling文件再次构建生成性能更好的可执行文件，以上步骤可以反复迭代。示例如下：
-TODO
 
 ## Truffle和多语言编程
 #### 什么是Truffle?
@@ -259,5 +258,35 @@ print("it costs {} s".format(end_ts - start_ts))
 GraalVM用Truffle实现了Java本身，即Java On Truffle，目前也处于试验阶段，不建议生产使用。
 
 ## 总结
-期待GraalVM和OpenJDK一起发展。
+GraalVM在应用层面存在三个关键能力：
+一、利用JVMCI将HotSpot c2 Compiler替换成Graal Compiler：
 
+优点：
+1. 由于JVMCI是可插拔式的，仅仅通过JVM参数就能开启和关闭，原有的Java应用程序通过"零"迁移成本就可能表现出更好的性能。 
+2. Graal Compiler由Java编写，更容易维护、拓展和调试。
+
+二、提供native-image可以将字节码提前编译成可执行程序，并提供大量命令行参数和工具供用户调优和监控。
+
+优点：
+1. 省去了java应用冷启动/warm up时间，刚运行就能达到性能峰值。 
+2. 内存消耗更低。
+3. 可执行文件不再依赖JDK，磁盘占用更低，利于压缩容器镜像大小。
+4. 鉴于以上优点，各种微服务框架（如Quarkus, Micronaut, Helidon, Spring Boot）和云原生场景慢慢开始拥抱native-image。
+
+不足：
+1. 不支持javaagent、bytecode manipulation。
+2. 反射、读取classpath下的资源文件、jni、jdk动态代理等动态特性需要手动通过配置文件或借助trace agent等工具来实现，总体来说还是比较麻烦。
+3. 对于后台长期运行且追求高吞吐的Java应用，AOT模式的峰值性能很多时候不如JIT模式。
+4. 目前体量大的Java应用很少有native-image提前编译成功的案例。
+
+三、提供Truffle动态语言实现框架和让多种编程语言能够运行在GraalVM平台上，提升语言性能的同时并支持多语言编程。
+
+优点：
+1. GraalVM团队有专门的人去维护Python、JavaScript、Ruby等语言。
+2. 借助Truffle实现的语言运行在GraalVM时，可以自动享受Truffle Compiler、Graal Compiler等jit编译,从而得到性能提升，并且可以借助Polyglot API进行多语言混合编程。
+
+不足：
+1. GraalPy还在起步阶段，在三方库（尤其是依赖C/C++）上支持的不是很好。
+2. Polyglot API能满足简单的跨语言调用，但对于复杂场景和模块化的支持不是很足。
+
+GraalVM出现在大众视野中还没有多久，很多地方还在不断优化，期待GraalVM和OpenJDK的一起发展～
