@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.xxywebsite</groupId>
+    <artifactId>graalvm-exploration</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+    </properties>
+
+    <dependencies>
+    </dependencies>
+
+
+    <profiles>
+        <profile>
+            <id>native</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <version>0.9.18</version>
+                        <configuration>
+                            <classesDirectory>${project.build.outputDirectory}</classesDirectory>
+                            <metadataRepository>
+                                <enabled>true</enabled>
+                            </metadataRepository>
+                            <requiredVersion>22.3</requiredVersion>
+                            <mainClass>com.xxywebsite.graalvm.WordCountPerformanceTest</mainClass>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>add-reachability-metadata</id>
+                                <phase>generate-resources</phase>
+                                <goals>
+                                    <goal>add-reachability-metadata</goal>
+                                </goals>
+                            </execution>
+                            <execution>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>compile-no-fork</goal>
+                                </goals>
+                                <configuration>
+                                    <buildArgs>
+                                        <arg>--gc=epsilon</arg>
+                                        <!--                                        <arg>&#45;&#45;enable-monitoring=heapdump,jvmstat</arg>-->
+                                        <arg>-o WordCountPerformanceTest_pgo</arg>
+                                        <!--                                        <arg>&#45;&#45;pgo-instrument</arg>-->
+                                        <arg>--pgo=default.iprof</arg>
+                                        <!--                                        <arg>&#45;&#45;language:python</arg>-->
+                                        <!--                                        <arg>-Ob</arg>-->
+                                        <!--                                        <arg>&#45;&#45;features=com.xxywebsite.graalvm.NativeImageFeature</arg>-->
+                                        <!--                                        <arg>&#45;&#45;initialize-at-build-time=com.xxywebsite,org.slf4j.impl.StaticLoggerBinder,ch.qos.logback.core.util.FileSize</arg>-->
+                                        <!--                                        <arg>&#45;&#45;trace-class-initialization=org.slf4j.impl.StaticLoggerBinder</arg>-->
+                                    </buildArgs>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+    </profiles>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.4.1</version>
+                <configuration>
+                    <createDependencyReducedPom>false</createDependencyReducedPom>
+                </configuration>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
