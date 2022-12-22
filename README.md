@@ -241,7 +241,7 @@ native-image生成的可执行程序可以借助jvisualvm工具进行监控，�
 #### 什么是Truffle?
 [Truffle](https://www.graalvm.org/latest/graalvm-as-a-platform/language-implementation-framework/)是一个开源的实现动态编程语言的框架，它可以使用户实现的编程语言高效的运行在GraalVM上。
 
-使用Truffle，用户只需关注构建抽象语法树（AST）和具体树节点的定义和执行逻辑，而Truffle专注于提升编程语言性能(借助Truffle Compile和Graal Compiler)和提供与其它编程语言的交互能力。
+使用Truffle，用户只需关注构建抽象语法树（AST）和具体树节点的定义和执行逻辑，而Truffle专注于提升编程语言性能(借助Truffle Compiler和Graal Compiler)和提供与其它编程语言的交互能力。
 
 目前GraalVM基于Truffle实现了[Python](https://github.com/oracle/graalpython)，[JavaScript](https://github.com/oracle/graaljs)，[Ruby](https://github.com/oracle/truffleruby/)，[R](https://github.com/oracle/fastr)，和支持运行能够被编译成LLVM bitcode的语言，如C/C++。
 
@@ -271,14 +271,14 @@ print("it costs {} s".format(end_ts - start_ts))
 #### 跨语言调用
 比较常见的应用场景是Java作为Host Language，其它语言作为Guest Language，实现多语言编程（运行在同一个进程里）：
 ![](https://bj.bcebos.com/cookie/polyglot-java-example.png)
-上述代码由Java编写，主要用到了Polyglot API。首先在"python"里创建了一个数组"[1，2，3]"，再将这个数组绑定到了"javascript"的上下文里，再由javascript去访问这个数组进行一个求和。从这个例子我们可以感受到GraalVM可以很方便地完成多语言的数据共享，并基于[Truffle Polyglot Interop Protocol](https://www.graalvm.org/22.2/reference-manual/java-on-truffle/interoperability/)保证了对象操作的安全性：上面由Python创建的数组，在js通过调用"pythonArr.length"时，实际会委托给对象的创建语言去执行，也就是调用python方法len。
+上述代码由Java编写，主要用到了Polyglot API。首先在"python"里创建了一个数组"[1，2，3]"，再将这个数组绑定到了"javascript"的上下文里，再由javascript去访问这个数组进行一个求和。从这个例子我们可以感受到GraalVM可以很方便地完成多语言的数据共享，并基于[Truffle Polyglot Interop Protocol](https://www.graalvm.org/22.2/reference-manual/java-on-truffle/interoperability/)保证了对象操作的安全性：上面由Python创建的数组，在js通过调用`pythonArr.length`时，实际会委托给对象的创建语言去执行，也就是调用python方法`len`。
 
 #### Java On Truffle
-GraalVM用Truffle实现了Java本身，即[Java On Truffle](https://www.graalvm.org/latest/reference-manual/java-on-truffle/)，目前也处于试验阶段，不建议生产使用，感兴趣的同学可以去看看介绍。
+GraalVM最近用Truffle实现了Java本身，即[Java On Truffle](https://www.graalvm.org/latest/reference-manual/java-on-truffle/)，目前也处于试验阶段，不建议生产使用，感兴趣的同学可以去看看介绍。
 
 ## 总结
 GraalVM在应用层面存在三个关键能力：
-一、利用JVMCI将HotSpot c2 Compiler替换成Graal Compiler：
+一、利用JVMCI将HotSpot c2 Compiler替换成Graal Compiler。
 `优点`：
 1. 由于JVMCI是可插拔式的，仅仅通过JVM参数就能开启和关闭，原有的Java应用程序通过"零"迁移成本就可能表现出更好的性能。 
 2. Graal Compiler由Java编写，更容易维护、拓展和调试。
