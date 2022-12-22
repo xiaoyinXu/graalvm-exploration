@@ -1,31 +1,70 @@
 # GraalVM探索
 
-## GraalVM介绍
-11月初的时候Spring Boot 3.0发布，其中有一个很吸引人的特性：aot（ahead ho time compilation），用户可以直接将Spring
-Boot应用提前编译成当前操作系统、CPU架构相关的能直接运行的机器代码。区别于传统Java应用jit(Just-In-Time compilation)的运行模式，aot使Java程序不再需要预热，大大提升了应用的启动速度，而Spring
-Boot 3.0 aot依赖的组件就是GraalVM里的native-image。
+## GraalVM简介
+11月初的时候Spring Boot发布3.0版本，其中有一个很亮眼的特性：aot（ahead ho time compilation），用户可以直接将Spring Boot应用提前编译成能直接运行的机器代码。区别于传统Java应用jit(Just-In-Time compilation)的运行模式，aot使Java程序不再需要预热，大大提升了应用的启动速度，而Spring Boot 3.0 aot依赖的组件就是GraalVM里的native-image。
 
-其实早在JDK9，OpenJDK就提供了jaotc命令支持，2016年由[JEP 295: Ahead-of-Time Compilation](https://openjdk.org/jeps/295)提出，而jaotc底层依赖的就是Graal
-Compiler的aot运行模式（Graal
-Compiler既支持jit也支持aot），但是由于其使用场景较少且维护成本大，2021年OpenJDK[JEP 410: Remove the Experimental AOT and JIT Compiler](https://openjdk.org/jeps/410)提出移除对Graal
-Compiler的支持，并指出想继续使用Graal Compiler的开发者可以转向GraalVM。
+其实早在JDK9，OpenJDK就提供了jaotc命令，即对AOT提供了有限支持。java的AOT在2016年由[JEP 295: Ahead-of-Time Compilation](https://openjdk.org/jeps/295)提出，而jaotc底层依赖的就是Graal Compiler(也就是GraalVM的核心部分)，但是由于其使用场景较少且维护成本大，2021年OpenJDK[JEP 410: Remove the Experimental AOT and JIT Compiler](https://openjdk.org/jeps/410)提出移除对Graal
+Compiler的支持，并指出开发者可以转向GraalVM。
 
-然而2022 10月25日 Oracle宣布将GraalVM贡献给Open JDK，意味着GraalVM会变得更"原生"，并跟随OpenJDK的节奏一起发展（每6月一个发行版本）。
+然而2022 10月25日 Oracle又宣布将GraalVM贡献给Open JDK，这意味着GraalVM会跟随OpenJDK的节奏一起发展（每6月一个发行版本）。
 
-那GraalVM是什么呢？GraalVM是一个完全由Java开发的[开源项目](https://github.com/oracle/graal)，根据官网的[介绍](https://www.graalvm.org/latest/docs/introduction/):
+那GraalVM是什么呢？GraalVM是一个完全由Java开发的[开源项目](https://github.com/oracle/graal)，同时也是JDK的一种发行版本。根据官网的[介绍](https://www.graalvm.org/latest/docs/introduction/):
 > GraalVM是一个高性能的JDK发型版本，它致力于加速JVM平台语言应用的执行，同时提供JavaScript, Python, Ruby, R, C/C++(需先转换成bitcode)的运行环境；GraalVM提供两种方式运行Java应用，JIT和AOT。GraalVM的使用户可以在一个应用里进行多语言编程（省去传统跨语言调用的开销）。
 
 GraalVM架构图：TODO
 
 GraalVM开源项目：TODO
 
-GraalVM底层聚焦于编译技术(Graal Compiler), 在应用层面提供三个关键的特性/能力：
+GraalVM在应用层面提供三个关键的特性/能力：
 
-1. JIT优化。通过[JVMCI](https://openjdk.org/jeps/243)，将Graal Compiler作为hotspot C2的替代。
-2. 支持AOT。提供native-image工具，
-3. 支持Polyglot Programming。 本文主要对这三个特性进行简单的介绍和做一些DEMO演示。
+1. 对已有的HotSpot JIT(just-in-time compilation，即时编译)进行优化。
+2. 支持AOT(ahead-of-time compilation, 提前编译)。
+3. 提供动态语言实现框架（Truffle）和支持多语言编程(Polyglot Programming)。
+   
+GraalVM底层聚焦的主要是编译技术，本文首先会谈一谈"编译"和"解释"的区别，"即时编译"和"提前编译"的区别，再主要讲讲GraalVM的三个主要特性。
+## 编译和解释
+按照我自己的理解：
 
-## JIT和Graal JIT Compiler
+编译：将"原始码"`整体`转换成"目标码"的过程。
+
+解释：将"原始码"`逐条`转换成"目标码"的过程。
+
+"原始码"并不一定是编程语言源代码，而"目标码"也并不一定是可以直接执行的机器码，编译和解释的区别主要在`整体`和`逐条`上。
+
+常见的编译型语言有C、C++、Golang、Rust等,它们的源代码在编译期间被`整体`转换成可以直接执行的机器码；常见的解释型语言有Python、Javascript，它们的源代码在运行期间被逐条解释执行。而Java严格意义上属于半编译半解释型语言，且它有多个编译阶段。首先Java源码通过javac被`整体`转换成字节码，这是第一阶段的编译。而在运行期间，当字节码被类加载器加载到虚拟机时,非热点方法的方法体的所有字节码指令(操作码 + 数据)会被`逐条`解释执行，而热点方法的整个方法体会被"整体"编译成机器码，这是第二阶段的编译。
+
+编译型语言特点：
+
+优点：
+1. 执行速度快。例如C/C++等编程语言，在运行时源码已经完全转换成可以直接执行的机器码了。
+
+缺点
+1. 灵活性差。一旦涉及到源码的改动，需要重新编译，而编译时间（尤其是大型项目）一般都是很漫长的。
+2. 可移植性/跨平台性差。例如C/C++等编程语言，源码编译后会被完全转换成和当前操作系统、CPU架构相关的机器码，而这个机器码一般是不太能移植到不同架构的平台的。所以一般对次的解决方案是cross-compilation(交叉编译), 即在一个平台上就能编译生成多个平台版本的机器码。
+
+解释性语言特点：
+
+优点：
+1. 可移植性/跨平台型好。
+2. 具有很多的动态特性，如动态类型，反射等。
+
+缺点：
+1. 执行速度慢。
+
+## 即时编译(jit)和提前编译(aot)
+即时编译(jit)即just-in-time compilation，编译发生在运行时。
+
+提前编译(aot)即ahead-of-time compilation, 编译发生在构建时。
+
+jit和aot本质上并没有什么不同，都是编译，都是将"原始码"整体转换成"目标码"，区别主要在发生的时机。当然啦，aot是一锤子买卖，也就意味着构建时需要做更多的分析。而jit一般伴随着后台监控线程，可以持续地优化关键的热点方法。
+
+常见的编译型语言的编译一般都是aot，优点（速度快）和缺点（灵活性、跨平台性差）都很明显，于是有了[llvm](https://github.com/llvm/llvm-project)项目，简单来说llvm抽象出了与具体编程语言和具体平台独立的中间形式IR（Intermediate Representation），llvm首先将"源码" 编译成LLVM bitcode，而LLVM bitcode可以被`lli` jit方式执行，也可以被`llc`aot编译成机器码。llvm通过引入IR对编译阶段解耦，使不同编程语言和不同平台的编译结果可以互相复用，且兼具了传统"编译性语言"的执行速度快和传统"解释型语言"的跨平台性，这和JVM的设计非常相似。
+
+而一般我们聊jit，大家想到的都是Java HotSpot虚拟机里的jit编译器，但实际JavaScript的V8、和一些Python实现(如PyPy)的虚拟机里也都有jit的存在，jit compiler一般会伴随解释器，目的也很明确，就是为了弥补解释执行速度慢的问题。jit相较于aot，一般会有预热阶段(warm up), 例如Java在云原生经常被诟病启动速度慢（当然还有内存占用大），但随着jit后台持续不断的监测和优化，最终Java程序的峰值性能也是很可观的。
+
+传统Java应用的运行方式都是解释器 + JIT compiler，GraalVM的出现，使得Java应用在AOT方向也慢慢开始发展，同时GraalVM使多语言混合编程也变成了一种可能。
+
+## HotSpot JIT Compiler和Graal JIT Compiler
 #### 什么是jit和warm up?
 jit即just-in-time(即时编译), java源码首先被javac编译成字节码.class文件，当字节码被类加载器加载到hotspot里后，java方法首先会被解释器执行，当方法被执行到一定次数会被识别成热点方法，并由jit
 compiler直接编译成本地机器能够执行的native代码，从而加速方法的执行效率。
@@ -96,10 +135,10 @@ compiler在编译方面优化较少但编译耗时短，c2 compiler在编译方�
 ![](image/tiered-compilation.png)
 默认情况下，我们可以粗略的认为，当一个方法被执行到2000次时会被c1 compiler进行编译，被执行到15000次会被c2 compiler进行编译。
 
-然而c2 compiler主要由C++编写，维护起来比较困难，最近几年jdk已经很少对其进行优化.
+然而c2 compiler主要由C++编写，维护起来比较困难，最近几年jdk已经很少对其进行优化。
 
 #### Graal Jit Compiler有什么优势？
-Graal Compiler完全由Java进行编写，没有历史包袱，根据Open JDK9提出的JVMCI规范(允许用java开发jit编译器)，Graal
+Graal Compiler完全由Java进行编写，没有历史包袱，根据Open JDK9提出的[JVMCI](https://openjdk.org/jeps/243)规范(允许用java开发jit编译器)，Graal
 Compiler可以作为c2的替代品，在一些场景提供更多的优化。这里需要指出jit在将字节码翻译成机器代码前会做很多优化，例如函数内联(Inline)、逃逸分析(Escape Analysis)等，而这些优化在Graal
 Compiler里被抽象成Phase，目前Graal Compiler内置了大概62个Phase，其中27个授予专利。我们可以通过Idea查看：
 ![](image/phase.png)
@@ -188,8 +227,12 @@ native-image提前编译Java程序后，可以使Java程序启动快、内存占
 jar包里又嵌套jar包，native-image对这种情况可能暂不支持）。不过考虑到稳定性和峰值性能，对于Flink这种持续运行在后台且追求高吞吐的场景，建议还是以jit的方式运行。
 
 #### native-maven-plugin
-
 为了使native-image更加工程化，GraalVM提供了相应的maven、gradle插件，用户可以将native-image用到的各种命令行参数维护在pom.xml配置文件，并通过mvn生命周期或者执行goal的方式一键构建。
+
+#### PGO
+native-image可以借助PGO(Profile-Guided Optimizations)进一步优化性能。具体可以参考[文章](https://www.graalvm.org/latest/reference-manual/native-image/guides/optimize-native-executable-with-pgo/)。
+大致步骤就是先通过native-image生成初版的可执行文件，运行该可执行文件生成profiling文件，并基于该profiling文件再次构建生成性能更好的可执行文件，以上步骤可以反复迭代。示例如下：
+TODO
 
 ## Truffle和多语言编程
 #### 什么是Truffle?
