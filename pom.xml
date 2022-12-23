@@ -49,11 +49,11 @@
                                 </goals>
                                 <configuration>
                                     <buildArgs>
-                                        <arg>--gc=epsilon</arg>
+                                        <arg>--gc=serial</arg>
                                         <!--                                        <arg>&#45;&#45;enable-monitoring=heapdump,jvmstat</arg>-->
-                                        <arg>-o WordCountPerformanceTest_pgo</arg>
+                                        <arg>-o ${project.basedir}/bin/WordCountPerformanceTest_serial</arg>
                                         <!--                                        <arg>&#45;&#45;pgo-instrument</arg>-->
-                                        <arg>--pgo=default.iprof</arg>
+<!--                                        <arg>&#45;&#45;pgo=default.iprof</arg>-->
                                         <!--                                        <arg>&#45;&#45;language:python</arg>-->
                                         <!--                                        <arg>-Ob</arg>-->
                                         <!--                                        <arg>&#45;&#45;features=com.xxywebsite.graalvm.NativeImageFeature</arg>-->

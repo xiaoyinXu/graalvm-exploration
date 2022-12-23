@@ -61,7 +61,7 @@ jit和aot本质上并没有什么不同，都是编译，都是将"原始码"整
 
 常见的编译型语言的编译一般都是aot，优点（速度快）和缺点（灵活性、跨平台性差）都很明显，于是有了[llvm](https://github.com/llvm/llvm-project)项目，简单来说llvm抽象出了与具体编程语言和具体平台独立的中间形式IR（Intermediate Representation），llvm首先将"源码" 编译成LLVM bitcode，而LLVM bitcode可以被`lli` jit方式执行，也可以被`llc`aot编译成机器码。llvm通过引入IR对编译阶段解耦，使不同编程语言和不同平台的编译结果可以互相复用，且兼具了传统"编译性语言"的执行速度快和传统"解释型语言"的跨平台性，这和JVM的设计非常相似。
 
-而一般我们聊jit，大家想到的都是Java HotSpot虚拟机里的jit编译器，但实际JavaScript的V8、和一些Python实现(如PyPy)的虚拟机里也都有jit的存在，jit compiler一般会伴随解释器，目的也很明确，就是为了弥补解释执行速度慢的问题。jit相较于aot，一般会有预热阶段(warm up)，例如Java在云原生场景经常被诟病启动速度慢（当然还有内存占用大），但随着jit后台持续不断的监测和优化，最终Java程序的峰值性能也是很可观的（一般还是慢于jit模式）。
+而一般我们聊jit，大家想到的都是Java HotSpot虚拟机里的jit编译器，但实际JavaScript的V8、和一些Python实现(如PyPy)的虚拟机里也都有jit的存在，jit compiler一般会伴随解释器，目的也很明确，就是为了弥补解释执行速度慢的问题。jit相较于aot，一般会有预热阶段(warm up)，例如Java在云原生场景经常被诟病启动速度慢（当然还有内存占用大），但随着jit后台持续不断的监测和优化，最终Java程序的峰值性能也是很可观的（甚至高于aot模式的峰值性能）。
 
 传统Java应用的运行方式都是解释器 + jit compiler，GraalVM的出现，使得Java应用在aot方向也慢慢开始发展，同时GraalVM使多语言混合编程也变成了一种可能。
 
